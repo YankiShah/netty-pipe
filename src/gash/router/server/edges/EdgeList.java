@@ -91,11 +91,10 @@ public class EdgeList {
 
 	public synchronized void addEdge(EdgeInfo ei){
 		if(!map.containsKey(ei.getRef()))
-		map.put(ei.getRef(),ei);
+			map.put(ei.getRef(),ei);
 	}
 
-	public synchronized boolean isEdge(EdgeInfo ei)
-	{
+	public synchronized boolean isEdge(EdgeInfo ei){
 		return map.containsKey(ei.getRef());
 	}
 }

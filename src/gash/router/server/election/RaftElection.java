@@ -100,7 +100,7 @@ public class RaftElection implements gash.router.server.election.Election {
             for(Channel ch : MessageServer.getEmon().getAllChannel())
             {
                 if(ch != null) {
-                    msg.toBuilder().getHeader().toBuilder().setMaxHops(workMessage.getHeader().getMaxHops() - 1);
+                    workMessage.toBuilder().getHeader().toBuilder().setMaxHops(workMessage.getHeader().getMaxHops() - 1);
 
                 }
             }
@@ -168,7 +168,7 @@ public class RaftElection implements gash.router.server.election.Election {
 
                         Work.WorkRequest.Builder wb = Work.WorkRequest.newBuilder();
                         wb.setHeader(hb);
-                        wb.getPayloadBuilder().setRaftmsg(rm);
+                        wb.getPayloadBuilder().setRaftmsg(workMessage.getPayload().getRaftmsg());
                         wb.setSecret(12345678);
                         ch.writeAndFlush(wb.build());
                     }
@@ -194,6 +194,7 @@ public class RaftElection implements gash.router.server.election.Election {
 
             Election.RaftMessage.Builder rf = RaftMessage.newBuilder();
             rf.setRaftAction(RaftMessage.RaftAction.THELEADERIS);
+
             rm.toBuilder().setHeader(hb);
             rm.getPayload().toBuilder().setRaftmsg(rf);
             for(Channel ch : MessageServer.getEmon().getAllChannel())
