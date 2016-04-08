@@ -21,6 +21,7 @@ import gash.router.server.PrintUtil;
 import gash.router.server.edges.EdgeInfo;
 import gash.router.server.edges.EdgeMonitor;
 import gash.router.server.election.RaftManager;
+import gash.router.server.listener.EdgeDisconnectionListener;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,8 +74,14 @@ public class WorkInboundAppWorker extends Thread {
 						logger.info("heartbeat from " + req.getHeader().getNodeId());
 						EdgeMonitor emon = MessageServer.getEmon();
 						EdgeInfo ei = new EdgeInfo(req.getHeader().getNodeId(),"",req.getHeader().getSource());
-						ei.setChannel(sq.getChannel());
-						emon.addToInbound(ei);
+						if(ei.getChannel() == null) {
+							//ei.setChannel(sq.getChannel());
+							Channel channel = emon.channelInit(req.getHeader().getSourceHost(), req.getHeader().getDestination());
+							ei.setChannel(channel);
+							//channel.closeFuture().addListener(new EdgeDisconnectionListener(emon, ei));
+							logger.info("Expects to connect to :" + req.getHeader().getNodeId());
+							emon.addToInbound(ei);
+						}
 						RaftManager.getInstance().assessCurrentState();
 					} else if (payload.hasPing()) {
 						logger.info("ping from <node,host> : <" + req.getHeader().getNodeId() + ", " + req.getHeader().getSourceHost()+">");
