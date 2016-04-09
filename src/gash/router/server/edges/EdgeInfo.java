@@ -27,6 +27,7 @@ public class EdgeInfo {
 	private boolean active = false;
 	private Channel channel;
 	private ChannelQueue queue;
+	private boolean clientChannel; //added by Manthan
 
 	public EdgeInfo(int ref, String host, int port) {
 		this.ref = ref;
@@ -89,6 +90,14 @@ public class EdgeInfo {
 
 	public void setQueue(ChannelQueue queue) {
 		this.queue = queue;
+	}
+
+	public boolean isClientChannel() {
+		return clientChannel;
+	}
+
+	public void setClientChannel(boolean clientChannel) {
+		this.clientChannel = clientChannel;
 	}
 
 	public boolean equals(Object x){

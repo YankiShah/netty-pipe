@@ -23,6 +23,7 @@ import gash.router.server.edges.EdgeMonitor;
 import gash.router.server.election.RaftManager;
 import gash.router.server.listener.EdgeDisconnectionListener;
 import gash.router.server.resources.Query;
+import gash.router.server.resources.Response;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,6 +140,10 @@ public class WorkInboundAppWorker extends Thread {
 					}else if (payload.hasQuery()) {
 						logger.debug("Query message on work channel from " + req.getHeader().getNodeId());
 						new Query(sq).handle(req);
+					}
+					else if (payload.hasResponse()) {
+						logger.debug("Response message on work channel from " + req.getHeader().getNodeId());
+						new Response(sq).handle(req);
 					}
 					else if (payload.hasErr()) {
 						Common.Failure err = payload.getErr();

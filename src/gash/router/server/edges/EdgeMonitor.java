@@ -217,8 +217,18 @@ public class EdgeMonitor implements EdgeListener, Runnable {
 		}
 	}
 
+	/**
+	 * Author : Manthan
+	 * */
 	public Collection<EdgeInfo> getOutboundEdgeInfoList(){
 		return outboundEdges.map.values();
+	}
+
+	/**
+	 * Author : Manthan
+	 * */
+	public Collection<EdgeInfo> getInboundEdgeInfoList(){
+		return inboundEdges.map.values();
 	}
 
 
@@ -270,7 +280,7 @@ public class EdgeMonitor implements EdgeListener, Runnable {
 	}
 
 	public synchronized void addToInbound(EdgeInfo ei) {
-		if(ei.getChannel() != null && !inboundEdges.isEdge(ei)){
+		if(ei.getChannel() != null && !inboundEdges.isEdge(ei) && !ei.isClientChannel()){
 			logger.info("New inbound edge from node "+ei.getRef()+" being added");
 
 			ei.setQueue(QueueFactory.getInstance(ei.getChannel(),state));
@@ -279,6 +289,13 @@ public class EdgeMonitor implements EdgeListener, Runnable {
 			inboundEdges.addEdge(ei);
 			this.state.setEmon(this);
 			logger.info("New inbound edge added <id,isChannelActive> " + "<" + ei.getRef()+"," + ei.isActive()+">");
+		}
+		else if(ei.getChannel() != null && !inboundEdges.isEdge(ei) && ei.isClientChannel()){
+			inboundEdges.addEdge(ei);
+			ei.setActive(true);
+			this.state.setEmon(this);
+			inboundEdges.addEdge(ei);logger.info("New client-inbound edge added <id,isChannelActive> " + "<" + ei.getRef()+"," + ei.isActive()+">");
+
 		}
 	}
 

@@ -19,6 +19,7 @@ package gash.router.app;
 import gash.router.client.CommConnection;
 import gash.router.client.CommListener;
 import gash.router.client.MessageClient;
+import global.Global;
 import routing.Pipe;
 
 public class DemoApp implements CommListener {
@@ -79,8 +80,8 @@ public class DemoApp implements CommListener {
 	}
 
 	@Override
-	public void onMessage(Pipe.CommandRequest msg) {
-		System.out.println("---> " + msg);
+	public void onMessage(Global.GlobalCommandMessage msg) {
+		System.out.println("Final message action from server. Data needs to be parsed ---> " + msg.getResponse().getAction());
 	}
 
 	/**

@@ -18,6 +18,7 @@ package gash.router.client;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import global.Global;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +35,7 @@ import routing.Pipe;
  * @author gash
  * 
  */
-public class CommHandler extends SimpleChannelInboundHandler<Pipe.CommandRequest> {
+public class CommHandler extends SimpleChannelInboundHandler<Global.GlobalCommandMessage> {
 	protected static Logger logger = LoggerFactory.getLogger("connect");
 	protected ConcurrentMap<String, CommListener> listeners = new ConcurrentHashMap<String, CommListener>();
 	//private volatile Channel channel;
@@ -70,7 +71,7 @@ public class CommHandler extends SimpleChannelInboundHandler<Pipe.CommandRequest
 	 *            The message
 	 */
 	@Override
-	protected void channelRead0(ChannelHandlerContext ctx, Pipe.CommandRequest msg) throws Exception {
+	protected void channelRead0(ChannelHandlerContext ctx, Global.GlobalCommandMessage msg) throws Exception {
 		System.out.println("--> got incoming message");
 		for (String id : listeners.keySet()) {
 			CommListener cl = listeners.get(id);

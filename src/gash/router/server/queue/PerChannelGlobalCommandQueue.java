@@ -17,7 +17,10 @@ package gash.router.server.queue;
 
 import com.google.protobuf.GeneratedMessage;
 import gash.router.container.RoutingConf;
+import gash.router.server.MessageServer;
 import gash.router.server.ServerState;
+import gash.router.server.edges.EdgeInfo;
+import global.Global;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -157,6 +160,11 @@ public class PerChannelGlobalCommandQueue implements ChannelQueue {
 	@Override
 	public void enqueueRequest(GeneratedMessage req, Channel notused) {
 		try {
+			EdgeInfo ei = new EdgeInfo(((Global.GlobalCommandMessage)req).getHeader().getNodeId(),((Global.GlobalCommandMessage)req).getHeader().getSourceHost(),-1);
+			ei.setChannel(notused);
+			ei.setClientChannel(true);
+			MessageServer.getEmon().addToInbound(ei);
+
 			inboundWork.put(req);
 		} catch (InterruptedException e) {
 			logger.error("message not enqueued for processing", e);
