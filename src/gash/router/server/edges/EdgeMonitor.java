@@ -105,6 +105,8 @@ public class EdgeMonitor implements EdgeListener, Runnable {
 		hb.setNodeId(state.getConf().getNodeId());
 		hb.setDestination(-1);
 		hb.setTime(System.currentTimeMillis());
+		hb.setDestination(state.getConf().getWorkPort());
+		hb.setSourceHost(ei.getHost());
 
 		Work.WorkRequest.Builder wb = Work.WorkRequest.newBuilder();
 		wb.setHeader(hb);
@@ -170,6 +172,8 @@ public class EdgeMonitor implements EdgeListener, Runnable {
 
 			// Make the connection attempt.
 			channelFuture = b.connect(host, port).syncUninterruptibly();
+			//channelFuture.channel().closeFuture().addListener(new EdgeDisconnectionListener(this,ei));
+
 		}
 		catch(Throwable ex)
 		{

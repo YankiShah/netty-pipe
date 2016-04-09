@@ -17,6 +17,7 @@ package gash.router.server.edges;
 
 import gash.router.server.queue.ChannelQueue;
 import io.netty.channel.Channel;
+import io.netty.util.internal.chmv8.ConcurrentHashMapV8;
 
 public class EdgeInfo {
 	private int ref;
