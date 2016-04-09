@@ -53,12 +53,18 @@ public class Query extends Resource {
                     }
                     break;
                 case STORE:
-                    int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
-                    Storage.Response.Builder rb = Storage.Response.newBuilder();
-                    rb.setAction(Storage.Action.GET);
-                    rb.setSuccess(result>0);
-                    logger.info("Result of save data in mongo :"+ result);
                     PrintUtil.printGlobalCommand(msg);
+                    if(MongoDAO.isSufficientSpace("test")){
+                        // needs change
+                        int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
+                        Storage.Response response = getResponseMessageForStore(result);
+                        logger.debug("Result of save data in mongo :"+ result);
+                        generateResponseOntoIncomingChannel(msg,response,true);
+                    }
+                    else{
+                        //forward the message for storage
+                        forwardRequestOnWorkChannel(msg,true);
+                    }
                     break;
                 case UPDATE:
                 case DELETE:
@@ -91,12 +97,18 @@ public class Query extends Resource {
                 }
                 break;
             case STORE:
-                int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
-                Storage.Response.Builder rb = Storage.Response.newBuilder();
-                rb.setAction(Storage.Action.GET);
-                rb.setSuccess(result>0);
-                logger.info("Result of save data in mongo :"+ result);
                 PrintUtil.printWork(msg);
+                if(MongoDAO.isSufficientSpace("test")){
+                    // needs change
+                    int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
+                    Storage.Response response = getResponseMessageForStore(result);
+                    logger.debug("Result of save data in mongo :"+ result);
+                    generateResponseOntoIncomingChannel(msg,response,false);
+                }
+                else{
+                    //forward the message for storage
+                    forwardRequestOnWorkChannel(msg,false);
+                }
                 break;
             case UPDATE:
             case DELETE:
@@ -111,6 +123,9 @@ public class Query extends Resource {
         return arrRespData;
     }
 
+    /**
+     * Author : Manthan
+     * */
     private Storage.Response getResponseMessageForGet(DataModel dataModel){
 
         Storage.Response.Builder rb = Storage.Response.newBuilder();
@@ -141,7 +156,7 @@ public class Query extends Resource {
                             hb.setDestination(clientMessage.getHeader().getDestination());// wont be available in case of request from client. but can be determined based on log replication feature
                             hb.setSourceHost(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId() + "_" + clientMessage.getHeader().getSourceHost());
                             hb.setDestinationHost(clientMessage.getHeader().getSourceHost()); // would be used to return message back to client
-                            hb.setMaxHops(5);
+                            hb.setMaxHops(3);
 
                             wb.setHeader(hb);
                             wb.setSecret(1234567809);
@@ -163,7 +178,7 @@ public class Query extends Resource {
                             wb.setPayload(clientMessage.getPayload()); // set the query from client
 
                         }
-                        if(hb.getMaxHops() != 0) {
+                        if(hb.getMaxHops() > 0) {
                             Work.WorkRequest work = wb.build();
                             edgeQueue.enqueueResponse(work, ei.getChannel());
                             msgDropFlag = false;
@@ -222,6 +237,16 @@ public class Query extends Resource {
             wb.setPayload(Work.Payload.newBuilder().setResponse(responseMsg)); // set the reponse to the client
             ((PerChannelWorkQueue) sq).enqueueResponse(wb.build(),null);
         }
+    }
+
+    /**
+     * Author : Manthan
+     * */
+    public Storage.Response getResponseMessageForStore(int result){
+        Storage.Response.Builder rb = Storage.Response.newBuilder();
+        rb.setAction(Storage.Action.STORE);
+        rb.setSuccess(result > 0);
+        return rb.build();
     }
 
 }

@@ -69,7 +69,7 @@ public class GlobalCommandInboundAppWorker extends Thread {
 					Global.GlobalCommandMessage req = ((Global.GlobalCommandMessage) msg);
 
 					if (req.hasPing()) {
-						logger.info("ping from " + req.getHeader().getNodeId());
+						/*logger.info("ping from " + req.getHeader().getNodeId());
 						if (req.getHeader().getDestination() == sq.getRoutingConf().getNodeId()) {
 							//handle message by self
 							logger.info("Message for me: " + req.getMessage() + " from " + req.getHeader().getSourceHost());
@@ -108,7 +108,8 @@ public class GlobalCommandInboundAppWorker extends Thread {
 								logger.info("No outbound edges to forward. To be handled");
 							}
 
-						}
+						}*/
+						new Ping(sq).handle(req);
 					}else if(req.hasQuery()){
 						new Query(sq).handle(req);
 					}

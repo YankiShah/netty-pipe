@@ -59,9 +59,9 @@ public class Response extends Resource {
                 forwardResponseOntoIncomingChannel(msg,false);
                 break;
             case STORE:
-
                 //todo
                 PrintUtil.printWork(msg);
+                forwardResponseOntoIncomingChannel(msg,false);
                 break;
             case UPDATE:
             case DELETE:
@@ -69,6 +69,9 @@ public class Response extends Resource {
         }
     }
 
+    /**
+     * Author : Manthan
+     * */
     private void forwardResponseOntoIncomingChannel(GeneratedMessage msg, boolean glabalCommandMessage){
 
         Common.Header.Builder hb = Common.Header.newBuilder();
