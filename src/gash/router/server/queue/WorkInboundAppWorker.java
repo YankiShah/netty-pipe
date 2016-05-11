@@ -22,7 +22,9 @@ import gash.router.server.edges.EdgeInfo;
 import gash.router.server.edges.EdgeMonitor;
 import gash.router.server.election.RaftManager;
 import gash.router.server.listener.EdgeDisconnectionListener;
+import gash.router.server.resources.Ping;
 import gash.router.server.resources.Query;
+import gash.router.server.resources.Response;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +81,7 @@ public class WorkInboundAppWorker extends Thread {
 						emon.addToInbound(ei);
 						RaftManager.getInstance().assessCurrentState();
 					} else if (payload.hasPing()) {
-						logger.info("ping from <node,host> : <" + req.getHeader().getNodeId() + ", " + req.getHeader().getSourceHost()+">");
+						/*logger.info("ping from <node,host> : <" + req.getHeader().getNodeId() + ", " + req.getHeader().getSourceHost()+">");
 						PrintUtil.printWork(req);
 						if(req.getHeader().getDestination() == sq.state.getConf().getNodeId()){
 							//handle message by self
@@ -134,11 +136,16 @@ public class WorkInboundAppWorker extends Thread {
 								//todo
 								logger.info("No outbound edges to forward. To be handled");
 							}
-						}
+						}*/
+						new Ping(sq).handle(req);
 
 					}else if (payload.hasQuery()) {
 						logger.debug("Query message on work channel from " + req.getHeader().getNodeId());
 						new Query(sq).handle(req);
+					}
+					else if (payload.hasResponse()) {
+						logger.debug("Response message on work channel from " + req.getHeader().getNodeId());
+						new Response(sq).handle(req);
 					}
 					else if (payload.hasErr()) {
 						Common.Failure err = payload.getErr();

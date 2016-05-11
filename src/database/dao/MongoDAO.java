@@ -104,4 +104,12 @@ public class MongoDAO {
         ArrayList<DataModel> result = MongoDAO.getData("test",new DataModel("Pranavkumar Masariya_Graduate Student(SE)_SJSU.pdf",0,null));
         System.out.println(result.size());
     }
+
+    public synchronized static boolean isSufficientSpace(String collectionName){
+        DBCollection dbCollection = MongoConnector.connectToCollection(collectionName);
+        CommandResult resultSet = dbCollection.getStats();
+
+        //System.out.println(resultSet.get("storageSize").toString());
+        return (((Integer)resultSet.get("storageSize") - (Integer)resultSet.get("size")) > 10240);
+    }
 }

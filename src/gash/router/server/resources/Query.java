@@ -44,7 +44,8 @@ public class Query extends Resource {
                     if(arrRespData.size() > 0){
                         //generate a response message
                         for(DataModel dataModel : arrRespData){
-                            Storage.Response response = getResponseMessage(dataModel);
+                            Storage.Response response = getResponseMessageForGet(dataModel);
+                            generateResponseOntoIncomingChannel(msg,response,true);
                         }
                     }
                     else{
@@ -52,12 +53,18 @@ public class Query extends Resource {
                     }
                     break;
                 case STORE:
-                    int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
-                    Storage.Response.Builder rb = Storage.Response.newBuilder();
-                    rb.setAction(Storage.Action.GET);
-                    rb.setSuccess(result>0);
-                    logger.info("Result of save data in mongo :"+ result);
                     PrintUtil.printGlobalCommand(msg);
+                    if(MongoDAO.isSufficientSpace("test")){
+                        // needs change
+                        int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
+                        Storage.Response response = getResponseMessageForStore(result);
+                        logger.debug("Result of save data in mongo :"+ result);
+                        generateResponseOntoIncomingChannel(msg,response,true);
+                    }
+                    else{
+                        //forward the message for storage
+                        forwardRequestOnWorkChannel(msg,true);
+                    }
                     break;
                 case UPDATE:
                 case DELETE:
@@ -81,7 +88,8 @@ public class Query extends Resource {
                 if(arrRespData.size() > 0){
                     //generate a response message
                     for(DataModel dataModel : arrRespData){
-                        Storage.Response response = getResponseMessage(dataModel);
+                        Storage.Response response = getResponseMessageForGet(dataModel);
+                        generateResponseOntoIncomingChannel(msg,response,false);
                     }
                 }
                 else{
@@ -89,12 +97,18 @@ public class Query extends Resource {
                 }
                 break;
             case STORE:
-                int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
-                Storage.Response.Builder rb = Storage.Response.newBuilder();
-                rb.setAction(Storage.Action.GET);
-                rb.setSuccess(result>0);
-                logger.info("Result of save data in mongo :"+ result);
                 PrintUtil.printWork(msg);
+                if(MongoDAO.isSufficientSpace("test")){
+                    // needs change
+                    int result = MongoDAO.saveData("test",new DataModel(query.getKey(),query.getSequenceNo(),query.getData().toByteArray()));
+                    Storage.Response response = getResponseMessageForStore(result);
+                    logger.debug("Result of save data in mongo :"+ result);
+                    generateResponseOntoIncomingChannel(msg,response,false);
+                }
+                else{
+                    //forward the message for storage
+                    forwardRequestOnWorkChannel(msg,false);
+                }
                 break;
             case UPDATE:
             case DELETE:
@@ -109,7 +123,10 @@ public class Query extends Resource {
         return arrRespData;
     }
 
-    private Storage.Response getResponseMessage(DataModel dataModel){
+    /**
+     * Author : Manthan
+     * */
+    private Storage.Response getResponseMessageForGet(DataModel dataModel){
 
         Storage.Response.Builder rb = Storage.Response.newBuilder();
         rb.setAction(Storage.Action.GET);
@@ -130,16 +147,16 @@ public class Query extends Resource {
                         PerChannelWorkQueue edgeQueue = (PerChannelWorkQueue) ei.getQueue();
                         Work.WorkRequest.Builder wb = Work.WorkRequest.newBuilder(); // message to be forwarded
                         Common.Header.Builder hb = Common.Header.newBuilder();
-                        hb.setNodeId(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId());
 
                         if(globalCommandMessage) {
                             Global.GlobalCommandMessage clientMessage = (Global.GlobalCommandMessage) msg;
 
+                            hb.setNodeId(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId());
                             hb.setTime(clientMessage.getHeader().getTime());
                             hb.setDestination(clientMessage.getHeader().getDestination());// wont be available in case of request from client. but can be determined based on log replication feature
                             hb.setSourceHost(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId() + "_" + clientMessage.getHeader().getSourceHost());
                             hb.setDestinationHost(clientMessage.getHeader().getSourceHost()); // would be used to return message back to client
-                            hb.setMaxHops(5);
+                            hb.setMaxHops(3);
 
                             wb.setHeader(hb);
                             wb.setSecret(1234567809);
@@ -149,6 +166,7 @@ public class Query extends Resource {
                         else{ // query in work message
                             Work.WorkRequest clientMessage = (Work.WorkRequest) msg;
 
+                            hb.setNodeId(((PerChannelWorkQueue) sq).gerServerState().getConf().getNodeId());
                             hb.setTime(clientMessage.getHeader().getTime());
                             hb.setDestination(clientMessage.getHeader().getDestination());// wont be available in case of request from client. but can be determined based on log replication feature
                             hb.setSourceHost(((PerChannelWorkQueue) sq).gerServerState().getConf().getNodeId() + "_" + clientMessage.getHeader().getSourceHost());
@@ -160,7 +178,7 @@ public class Query extends Resource {
                             wb.setPayload(clientMessage.getPayload()); // set the query from client
 
                         }
-                        if(hb.getMaxHops() != 0) {
+                        if(hb.getMaxHops() > 0) {
                             Work.WorkRequest work = wb.build();
                             edgeQueue.enqueueResponse(work, ei.getChannel());
                             msgDropFlag = false;
@@ -181,6 +199,54 @@ public class Query extends Resource {
                 logger.info("No outbound edges to forward. To be handled");
             }
 
+    }
+
+    private void generateResponseOntoIncomingChannel(GeneratedMessage msg,Storage.Response responseMsg, boolean glabalCommandMessage){
+
+        Common.Header.Builder hb = Common.Header.newBuilder();
+        hb.setTime(System.currentTimeMillis());
+
+        if(glabalCommandMessage){
+
+            Global.GlobalCommandMessage clientMessage = (Global.GlobalCommandMessage) msg;
+            Global.GlobalCommandMessage.Builder cb = Global.GlobalCommandMessage.newBuilder(); // message to be returned to actual client
+
+            hb.setNodeId(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId());
+            hb.setDestination(clientMessage.getHeader().getDestination());// wont be available in case of request from client. but can be determined based on log replication feature
+            hb.setSourceHost(Integer.toString(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId()));
+            hb.setDestinationHost(clientMessage.getHeader().getSourceHost()); // would be used to return message back to client
+
+            cb.setHeader(hb);
+            cb.setResponse(responseMsg); // set the reponse to the client
+            ((PerChannelGlobalCommandQueue) sq).enqueueResponse(cb.build(),null);
+        }
+        else{
+            Work.WorkRequest clientMessage;
+            clientMessage = (Work.WorkRequest) msg;
+            Work.WorkRequest.Builder wb = Work.WorkRequest.newBuilder(); // message to be returned
+
+            hb.setNodeId(((PerChannelWorkQueue) sq).gerServerState().getConf().getNodeId());
+
+            hb.setDestination(Integer.parseInt(clientMessage.getHeader().getSourceHost().substring(0,clientMessage.getHeader().getSourceHost().indexOf('_'))));// wont be available in case of request from client. but can be determined based on log replication feature
+            hb.setSourceHost(clientMessage.getHeader().getSourceHost().substring(clientMessage.getHeader().getSourceHost().indexOf('_')+1));
+            hb.setDestinationHost(clientMessage.getHeader().getDestinationHost()); // would be used to return message back to client
+            hb.setMaxHops(5);
+
+            wb.setHeader(hb);
+            wb.setSecret(1234567809);
+            wb.setPayload(Work.Payload.newBuilder().setResponse(responseMsg)); // set the reponse to the client
+            ((PerChannelWorkQueue) sq).enqueueResponse(wb.build(),null);
+        }
+    }
+
+    /**
+     * Author : Manthan
+     * */
+    public Storage.Response getResponseMessageForStore(int result){
+        Storage.Response.Builder rb = Storage.Response.newBuilder();
+        rb.setAction(Storage.Action.STORE);
+        rb.setSuccess(result > 0);
+        return rb.build();
     }
 
 }

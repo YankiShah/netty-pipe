@@ -1,5 +1,6 @@
 package gash.router.server.resources;
 
+import com.google.protobuf.GeneratedMessage;
 import gash.router.server.MessageServer;
 import gash.router.server.PrintUtil;
 import gash.router.server.edges.EdgeInfo;
@@ -27,47 +28,12 @@ public class Ping extends Resource {
             logger.info("Setup queue is not global queue");
             return;
         }
-        boolean msgDropFlag;
-
         
         if(msg.getHeader().getDestination() == ((PerChannelGlobalCommandQueue)sq).getRoutingConf().getNodeId()){
             logger.info("ping from " + msg.getHeader().getNodeId());
         }
         else{ //message doesn't belong to current node. Forward on other edges
-            msgDropFlag = true;
-            if(MessageServer.getEmon() != null){// forward if Comm-worker port is active
-                for(EdgeInfo ei :MessageServer.getEmon().getOutboundEdgeInfoList()){
-                    if(ei.isActive() && ei.getChannel() != null){// check if channel of outboundWork edge is active
-                        Work.WorkRequest.Builder wb = Work.WorkRequest.newBuilder();
-
-                        Common.Header.Builder hb = Common.Header.newBuilder();
-                        hb.setNodeId(((PerChannelGlobalCommandQueue)sq).getRoutingConf().getNodeId());
-                        hb.setTime(msg.getHeader().getTime());
-                        hb.setDestination(msg.getHeader().getDestination());
-                        hb.setSourceHost(((PerChannelGlobalCommandQueue)sq).getRoutingConf().getNodeId()+"_"+msg.getHeader().getSourceHost());
-                        hb.setDestinationHost(msg.getHeader().getDestinationHost());
-                        hb.setMaxHops(5);
-
-                        wb.setHeader(hb);
-                        wb.setSecret(1234567809);
-                        wb.setPayload(Work.Payload.newBuilder().setPing(true));
-
-                        Work.WorkRequest work = wb.build();
-
-                        PerChannelWorkQueue edgeQueue = (PerChannelWorkQueue) ei.getQueue();
-                        edgeQueue.enqueueResponse(work,ei.getChannel());
-                        msgDropFlag = false;
-                        logger.info("Workmessage queued");
-                    }
-                }
-                if(msgDropFlag)
-                    logger.info("Message dropped <node,ping,destination>: <" + msg.getHeader().getNodeId()+"," + msg.getPing()+"," + msg.getHeader().getDestination()+">");
-            }
-            else{// drop the message or queue it for limited time to send to connected node
-                //todo
-                logger.info("No outbound edges to forward. To be handled");
-            }
-
+            forwardRequestOnWorkChannel(msg,true);
         }
 
 
@@ -134,67 +100,81 @@ public class Ping extends Resource {
             return;
         }
 
-        boolean msgDropFlag;
-
-        logger.info("ping from <node,host> : <" + msg.getHeader().getNodeId() + ", " + msg.getHeader().getSourceHost()+">");
+        logger.debug("ping from <node,host> : <" + msg.getHeader().getNodeId() + ", " + msg.getHeader().getSourceHost()+">");
         PrintUtil.printWork(msg);
         
         
         if(msg.getHeader().getDestination() == ((PerChannelWorkQueue)sq).gerServerState().getConf().getNodeId()){
-            logger.info("Ping for me: " + " from "+ msg.getHeader().getSourceHost());
-
-            Work.WorkRequest.Builder rb = Work.WorkRequest.newBuilder();
-
-            Common.Header.Builder hb = Common.Header.newBuilder();
-            hb.setNodeId(((PerChannelWorkQueue)sq).gerServerState().getConf().getNodeId());
-            hb.setTime(System.currentTimeMillis());
-            hb.setDestination(Integer.parseInt(msg.getHeader().getSourceHost().substring(msg.getHeader().getSourceHost().lastIndexOf('_')+1)));
-            hb.setSourceHost(msg.getHeader().getSourceHost().substring(msg.getHeader().getSourceHost().indexOf('_')+1));
-            hb.setDestinationHost(msg.getHeader().getSourceHost());
-            hb.setMaxHops(5);
-
-            rb.setHeader(hb);
-            rb.setSecret(1234567809);
-            rb.setPayload(Work.Payload.newBuilder().setPing(true));
-            //channel.writeAndFlush(rb.build());
-            sq.enqueueResponse(rb.build(),((PerChannelWorkQueue)sq).getChannel());
+            logger.debug("Ping for me: " + " from "+ msg.getHeader().getSourceHost());
         }
         else { //message doesn't belong to current node. Forward on other edges
-            msgDropFlag = true;
-            if (msg.getHeader().getMaxHops() > 0 && MessageServer.getEmon() != null) {// forward if Comm-worker port is active
-                for (EdgeInfo ei : MessageServer.getEmon().getOutboundEdgeInfoList()) {
-                    if (ei.isActive() && ei.getChannel() != null) {// check if channel of outbound edge is active
-                        logger.debug("Workmessage being sent");
-                        Work.WorkRequest.Builder wb = Work.WorkRequest.newBuilder();
-
-                        Common.Header.Builder hb = Common.Header.newBuilder();
-                        hb.setNodeId(((PerChannelWorkQueue)sq).gerServerState().getConf().getNodeId());
-                        hb.setTime(msg.getHeader().getTime());
-                        hb.setDestination(msg.getHeader().getDestination());
-                        hb.setSourceHost(((PerChannelWorkQueue)sq).gerServerState().getConf().getNodeId()+"_"+msg.getHeader().getSourceHost());
-                        hb.setDestinationHost(msg.getHeader().getDestinationHost());
-                        hb.setMaxHops(msg.getHeader().getMaxHops() -1);
-
-                        wb.setHeader(hb);
-                        wb.setSecret(1234567809);
-                        wb.setPayload(Work.Payload.newBuilder().setPing(true));
-                        //ei.getChannel().writeAndFlush(wb.build());
-                        PerChannelWorkQueue edgeQueue = (PerChannelWorkQueue) ei.getQueue();
-                        edgeQueue.enqueueResponse(wb.build(),ei.getChannel());
-                        msgDropFlag = false;
-                        logger.debug("Workmessage sent");
-                    }
-                }
-                if (msgDropFlag)
-                    logger.info("Message dropped <node,ping,destination>: <" + msg.getHeader().getNodeId() + "," + msg.getPayload().getPing() + "," + msg.getHeader().getDestination() + ">");
-            } else {// drop the message or queue it for limited time to send to connected node
-                //todo
-                logger.info("No outbound edges to forward. To be handled");
-            }
+            forwardRequestOnWorkChannel(msg,true);
         }
 
     }
 
+    private void forwardRequestOnWorkChannel(GeneratedMessage msg, boolean globalCommandMessage){
 
+
+        boolean msgDropFlag = true;
+        if (MessageServer.getEmon() != null) {// forward if Comm-worker port is active
+            for (EdgeInfo ei : MessageServer.getEmon().getOutboundEdgeInfoList()) {
+                if (ei.isActive() && ei.getChannel() != null) {// check if channel of outboundWork edge is active
+                    PerChannelWorkQueue edgeQueue = (PerChannelWorkQueue) ei.getQueue();
+                    Work.WorkRequest.Builder wb = Work.WorkRequest.newBuilder(); // message to be forwarded
+                    Common.Header.Builder hb = Common.Header.newBuilder();
+
+                    if(globalCommandMessage) {
+                        Global.GlobalCommandMessage clientMessage = (Global.GlobalCommandMessage) msg;
+
+                        hb.setNodeId(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId());
+                        hb.setTime(clientMessage.getHeader().getTime());
+                        hb.setDestination(clientMessage.getHeader().getDestination());// wont be available in case of request from client. but can be determined based on log replication feature
+                        hb.setSourceHost(((PerChannelGlobalCommandQueue) sq).getRoutingConf().getNodeId() + "_" + clientMessage.getHeader().getSourceHost());
+                        hb.setDestinationHost(clientMessage.getHeader().getSourceHost()); // would be used to return message back to client
+                        hb.setMaxHops(1);
+
+                        wb.setHeader(hb);
+                        wb.setSecret(1234567809);
+                        wb.setPayload(Work.Payload.newBuilder().setPing(true)); // set the ping from client
+
+                    }
+                    else{ // query in work message
+                        Work.WorkRequest clientMessage = (Work.WorkRequest) msg;
+
+                        hb.setNodeId(((PerChannelWorkQueue) sq).gerServerState().getConf().getNodeId());
+                        hb.setTime(clientMessage.getHeader().getTime());
+                        hb.setDestination(clientMessage.getHeader().getDestination());// wont be available in case of request from client. but can be determined based on log replication feature
+                        hb.setSourceHost(((PerChannelWorkQueue) sq).gerServerState().getConf().getNodeId() + "_" + clientMessage.getHeader().getSourceHost());
+                        hb.setDestinationHost(clientMessage.getHeader().getDestinationHost()); // would be used to return message back to client
+                        hb.setMaxHops(((Work.WorkRequest) msg).getHeader().getMaxHops() - 1);
+
+                        wb.setHeader(hb);
+                        wb.setSecret(1234567809);
+                        wb.setPayload(Work.Payload.newBuilder().setPing(true)); // set the ping from client
+
+                    }
+                    if(hb.getMaxHops() > 0) {
+                        Work.WorkRequest work = wb.build();
+                        edgeQueue.enqueueResponse(work, ei.getChannel());
+                        msgDropFlag = false;
+                        logger.info("Workmessage pertaining to client ping queued");
+                    }
+                    if (msgDropFlag && globalCommandMessage)
+                        logger.info("Message dropped <node,ping,source>: <" + ((Global.GlobalCommandMessage) msg).getHeader().getNodeId()
+                                + "," + ((Global.GlobalCommandMessage) msg).getPing() + "," + ((Global.GlobalCommandMessage) msg).getHeader().getSourceHost() + ">");
+                    else if(msgDropFlag && !globalCommandMessage)
+                        logger.info("Message dropped <node,ping,source>: <" + ((Work.WorkRequest) msg).getHeader().getNodeId()
+                                + "," + ((Work.WorkRequest) msg).getPayload().getPing() + "," + ((Work.WorkRequest) msg).getHeader().getSourceHost() + ">");
+
+                }
+
+            }
+        } else {// drop the message or queue it for limited time to send to connected node
+            //todo
+            logger.info("No outbound edges to forward. To be handled");
+        }
+
+    }
 
 }

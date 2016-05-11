@@ -19,6 +19,7 @@ package gash.router.app;
 import gash.router.client.CommConnection;
 import gash.router.client.CommListener;
 import gash.router.client.MessageClient;
+import global.Global;
 import routing.Pipe;
 
 public class DemoApp implements CommListener {
@@ -79,8 +80,11 @@ public class DemoApp implements CommListener {
 	}
 
 	@Override
-	public void onMessage(Pipe.CommandRequest msg) {
-		System.out.println("---> " + msg);
+	public void onMessage(Global.GlobalCommandMessage msg) {
+		if(msg.getResponse().getAction().equals("STORE"))
+			System.out.println("Result of data save request : Saved successfully---> " + msg.getResponse().getSuccess());
+		else // for GET message response
+			System.out.println("Final message action from server. Data needs to be parsed ---> " + msg.getResponse().getAction());
 	}
 
 	/**
@@ -99,9 +103,9 @@ public class DemoApp implements CommListener {
 			// do stuff w/ the connection
 			da.ping(2);
 
-			da.message("Hello System!!");
+			//da.message("Hello System!!");
 
-			//da.save("/Users/rushil/Downloads/work-stealing2.pdf");
+			//da.save("/home/manthan/Downloads/work-stealing2.pdf");
 
 			System.out.println("\n** exiting in 10 seconds. **");
 			System.out.flush();
